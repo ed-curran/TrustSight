@@ -1,0 +1,16 @@
+{
+  "$id": "http:/localhost:3001/dpdtf-participant.schema.json",
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "title": "Participant of the demo property data trust framework",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "domain": {
+      "type": "string"
+    }
+  },
+  "required": ["name"],
+  "additionalProperties": false
+}

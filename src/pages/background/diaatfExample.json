@@ -1,0 +1,16 @@
+{
+  "id": "17c9eedd-ee72-4157-bf64-921a38fb5de2",
+  "title": "Participants of the demo uk digital identity and attributes trust framework",
+  "author": "did:example:dsit",
+  "created": "2023-10-29T21:52:27Z",
+  "validFrom": "2023-10-29T21:52:27Z",
+  "version": "0.0.1",
+  "entries": {
+    "https://example.com/diaatf-partipant.json": {
+      "did:example:ed": {
+        "name": "yo",
+        "domain": "https://pdtf.example"
+      }
+    }
+  }
+}

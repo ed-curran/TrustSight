@@ -1,0 +1,16 @@
+{
+  "$id": "http:/localhost:3001/dpdtf-issuer.schema.json",
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "title": "Issuer of property data",
+  "type": "object",
+  "properties": {
+    "credentials": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": ["credentials"],
+  "additionalProperties": false
+}

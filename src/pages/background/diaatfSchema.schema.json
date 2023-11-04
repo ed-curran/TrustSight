@@ -1,0 +1,16 @@
+{
+  "$id": "https://example.com/diaatf-participant.schema.json",
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "title": "Trusted participant of the UK's digital identity and attributes trust framework",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "domain": {
+      "type": "string"
+    }
+  },
+  "required": ["name"],
+  "additionalProperties": false
+}

@@ -1,0 +1,31 @@
+{
+  "id": "17c9eedd-ee72-4157-bf64-921a38fb5de2",
+  "title": "Participants of the demo property data trust framework",
+  "author": "did:example:ed",
+  "created": "2023-10-29T21:52:27Z",
+  "validFrom": "2023-10-29T21:52:27Z",
+  "version": "0.0.1",
+  "entries": {
+    "https://example.com/dpdtf-partipant.json": {
+      "did:key:z6MkoTHsgNNrby8JzCNQ1iRLyW5QQ6R8Xuu6AA8igGrMVPUM": {
+        "name": "yo",
+        "domain": "https://identity.foundation"
+      },
+      "did:example:propertyproxy": {
+        "name": "propertyproxy",
+        "domain": "https://propertyproxy.com"
+      }
+    },
+    "http:/localhost:3001/dpdtf-issuer.schema.json": {
+      "did:key:z6MkoTHsgNNrby8JzCNQ1iRLyW5QQ6R8Xuu6AA8igGrMVPUM": {
+        "credentials": ["test"]
+      },
+      "did:example:propertyproxy": {
+        "credentials": [
+          "example.com/dankest-meme.schema.json",
+          "example.com/dankest-meme.schema.json.ld"
+        ]
+      }
+    }
+  }
+}
