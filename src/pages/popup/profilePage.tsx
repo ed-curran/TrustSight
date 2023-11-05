@@ -138,13 +138,13 @@ export default function ProfilePage({
           }}
           className={`flex space-x-3 ${
             profile.didProfile?.assertions.length > 1 && 'overflow-x-scroll'
-          } w-200 scrollbar-h-[5px] scrollbar scrollbar-thumb-primary/80 scrollbar-track-accent/50 scrollbar-thumb-rounded-full`}
+          } w-200 scrollbar-h-[5px] scrollbar scrollbar-thumb-primary/80 scrollbar-track-accent/50 scrollbar-thumb-rounded-full mt-2`}
         >
           {profile.didProfile.assertions.map((triple) => (
             <li
-              className={`flex-none 'py-2' ${
+              className={`flex-none ${
                 profile.didProfile?.assertions.length === 1 && 'px-2'
-              } mb-1 min-h-[128px]`}
+              } mb-3`}
               key={tripleToString(triple)}
             >
               <AssertionCard
@@ -184,8 +184,8 @@ function AssertionCard({
     <Card
       key={triple.predicate}
       className={
-        `py-3 hover:border-foreground/30 cursor-pointer w-64 min-h-[118px] ${
-          selected ? 'h-[254px]' : ''
+        `py-3 hover:border-foreground/30 cursor-pointer w-64 min-h-[128px] ${
+          selected ? 'h-[264px]' : ''
         }` + (selected ? ' border-foreground/30' : '')
       }
       onClick={() => {
