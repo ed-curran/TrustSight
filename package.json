@@ -1,9 +1,9 @@
 {
-  "name": "trust-lock",
-  "displayName": "TrustLock",
+  "name": "trust-sight",
+  "displayName": "TrustSight",
   "description": "The trust overlay for your browser",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.0.1",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",

@@ -137,7 +137,9 @@ export const TrustDocImporter = (props: TrustDocImporterProps) => {
             size={'icon'}
             variant={'destructive'}
             onClick={() => {
-              chrome.runtime.sendMessage({ type: 'clearState' } as ClearState);
+              chrome.runtime.sendMessage({ type: 'clearState' } as ClearState).then(() => chrome.permissions.remove({
+                permissions: ['tabs']
+              }))
             }}
           >
             <TrashIcon />
@@ -268,7 +270,6 @@ function AddTrustDocForm({ onAdded, ...props }: AddTrustDocProps) {
       ? await fetchDoc(docJsonOrLink, undefined)
       : parseDoc(docJsonOrLink);
 
-    console.log(result);
     if (result.status === 'failure') {
       //gross
       setError((result.error as any).toString());
@@ -298,16 +299,12 @@ function AddTrustDocForm({ onAdded, ...props }: AddTrustDocProps) {
     <form
       className={cx('space-y-2', props.className)}
       onSubmit={(e) => {
-        console.log('submitted pls');
-        console.log(e);
         // Prevent the browser from reloading the page
         e.preventDefault();
 
         // Read the form data
         const form = e.target as HTMLFormElement;
         const formData = new FormData(form);
-        const formJson = Object.fromEntries(formData.entries());
-        console.log(formJson);
 
         const docOrLink = formData.get('doc');
         if (docOrLink) {

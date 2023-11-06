@@ -24,26 +24,22 @@ export async function verifyVc(
   const keyPair = await Ed25519VerificationKey2020.generate();
   const suite = new Ed25519Signature2020({ key: keyPair });
 
-  console.log(args);
   if (args.proofFormat === ProofFormatTypesEnum.JSON_LD) {
     suite.verificationMethod = (
       args.credential as ISignedDomainLinkageCredential
     ).credentialSubject.id;
 
-    // return await vc.verifyCredential({
-    //   credential: args.credential,
-    //   suite,
-    //   documentLoader: new DocumentLoader().getLoader(),
-    // });
-    return {
-      verified: true,
-    };
+    return await vc.verifyCredential({
+      credential: args.credential,
+      suite,
+      documentLoader: new DocumentLoader().getLoader(),
+    });
   }
 
   //todo do vc-jwt verification
 
   return {
-    verified: true,
+    verified: false,
   };
 }
 

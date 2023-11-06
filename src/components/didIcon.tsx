@@ -20,7 +20,7 @@ export const DidIcon = ({
   return (
     <TooltipProvider>
       <Tooltip>
-        <TooltipTrigger className={className}>
+        <TooltipTrigger className={className} asChild>
           <button
             onClick={(e) => {
               e.stopPropagation();

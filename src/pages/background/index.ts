@@ -1,15 +1,11 @@
-import { newVerifier } from '@/lib/domainverifier/verifier';
-import {
-  IDidConfigurationResource,
-  ValidationStatusEnum,
-} from '@sphereon/wellknown-dids-client';
-import { IDomainLinkageCredential } from '@sphereon/wellknown-dids-client/dist/types';
-import { verifyResourceStructure } from '@sphereon/wellknown-dids-client/dist/utils';
+import {newVerifier} from '@/lib/domainverifier/verifier';
+import {IDidConfigurationResource, ValidationStatusEnum,} from '@sphereon/wellknown-dids-client';
+import {IDomainLinkageCredential} from '@sphereon/wellknown-dids-client/dist/types';
+import {verifyResourceStructure} from '@sphereon/wellknown-dids-client/dist/utils';
 import level from 'level';
 //levelgraph needs level 7.0.0, 8.0 breaks which is a shame because 8.0 actually has types
 import levelgraph from 'levelgraph';
-import { promisifyLevelGraph } from '@/lib/levelgraph';
-import diaatfExample from './diaatfExample.json';
+import {promisifyLevelGraph} from '@/lib/levelgraph';
 import {
   AssertionSetTriple,
   JsonSchema,
@@ -18,13 +14,10 @@ import {
   toUniqueTopics,
   TrustEstablishmentDoc,
 } from '@/lib/trustestablishment/trustEstablishment';
-import { ContentMessage, GetLinksResponse } from '@/pages/content';
-import { tabs } from 'webextension-polyfill';
-import { drawIcon as jdenticonDrawIcon } from 'jdenticon';
+import {drawIcon as jdenticonDrawIcon} from 'jdenticon';
 
-const db = level('example5');
+const db = level('trustgraph');
 const graph = promisifyLevelGraph(levelgraph(db));
-graph.put(toTriples(diaatfExample)).then(() => console.log('put diaatf'));
 
 export type LinkedIdentifier = {
   origin: string; //should be origin?
@@ -44,10 +37,7 @@ async function getVerifiedDomainDid(
   }
   //todo error handling when we get a weird did configuration
   const didConfiguration = await didConfigurationResponse.json();
-  console.log(didConfiguration);
 
-  const parsed = await verifyResourceStructure(didConfiguration);
-  console.log(parsed);
   //i find it annoying that this doesn't extract useful information like the dids and origin for us
   //it also doesn't provide a way to verify that the origin in the linkedDids credentials matches the origin we expect.
   //Which is weird. So we have to do that ourselves.
@@ -55,7 +45,7 @@ async function getVerifiedDomainDid(
     configuration: didConfiguration,
   });
 
-  console.log(result);
+  console.log(result.credentials)
   if (
     !result.credentials ||
     result.credentials.length === 0 ||
@@ -141,16 +131,14 @@ async function getOriginDetails(url: string): Promise<Profile> {
   const state = await chrome.storage.local.get(origin);
   const originState: LinkedIdentifier = state[origin];
 
-  console.log(originState.did);
   //todo: set icon
   if (!originState.did) {
-    console.log('send');
     return {
       origin: originState.origin,
       didProfile: undefined,
     };
   }
-  console.log(state);
+
   const triples = await graph.get<AssertionSetTriple>({
     subject: originState.did,
   });
@@ -160,8 +148,7 @@ async function getOriginDetails(url: string): Promise<Profile> {
   //ugly cast here
   const schemas: Record<string, JsonSchema> =
     await chrome.storage.local.get(topics);
-  console.log(triples);
-  console.log(originState.origin);
+
   return {
     origin: originState.origin,
     didProfile: {
@@ -171,13 +158,6 @@ async function getOriginDetails(url: string): Promise<Profile> {
     },
   };
 }
-chrome.runtime.onInstalled.addListener(({ reason }) => {
-  if (reason === 'install') {
-    chrome.storage.local.set({
-      apiSuggestions: ['tabs', 'storage', 'scripting'],
-    });
-  }
-});
 chrome.tabs.onActivated.addListener(function (tab) {
   // chrome.runtime.sendMessage({
   //   type: 'originActivated',
@@ -198,124 +178,114 @@ chrome.tabs.onActivated.addListener(function (tab) {
   // });
 });
 
-chrome.tabs.onUpdated.addListener(async function (tabId, changeInfo, tab) {
-  console.log('ok');
-  console.log(changeInfo.url);
+async function saveOrigin(tabId: number, url: string): Promise<LinkedIdentifier> {
+  const { origin } = new URL(url);
+  //todo: check for cached origin
+  const domainDidResult = await getVerifiedDomainDid(origin);
+  console.log(domainDidResult)
+  //put in local storage
+  if (domainDidResult.status === 'failure') {
+    const identifier: LinkedIdentifier = {
+        origin: origin,
+        did: undefined,
+      }
+    chrome.storage.local.set(identifier);
+    return identifier;
+  }
+  //we store keyed on both origin and did
+  //cus sometimes we only have one or the other
+  //should probably use a better storage solution with indexes or something
+  const identifier: LinkedIdentifier = {
+    origin: origin,
+    did: domainDidResult.did,
+  };
+  await chrome.storage.local.set({
+    [origin]: identifier,
+  });
+  await chrome.storage.local.set({
+    [domainDidResult.did]: identifier,
+  });
 
+  const canvas = new OffscreenCanvas(32, 32);
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    console.log('set icon')
+    //its fiiine
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    jdenticonDrawIcon(ctx, domainDidResult.did, 32, {
+      // backColor: '#fff',
+    });
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    const imageData = ctx.getImageData(4, 4, 24, 24);
+    chrome.action.setIcon({
+      tabId: tabId,
+      imageData: imageData,
+    });
+  }
+
+  return identifier
+}
+
+chrome.tabs.onUpdated.addListener(async function (tabId, changeInfo, tab) {
   //todo: reference count origins and delete unused ones
   //basically we're having to deal with how to do cache invalidation for origins
   //my plan is just to reuse cached origins untill no tabs are using that origin and then unload it
-  if (changeInfo.status == 'complete' && tab.active && tab.url) {
-    console.log('complete yay');
-    //   chrome.action.setBadgeText(
-    //     {
-    //       text: "cool"
-    //     }
-    // )
-
-    //relative to what?
-    const { hostname, origin, host } = new URL(tab.url);
-    console.log({ hostname, origin, host });
-    //todo: check for cached origin
-    const domainDidResult = await getVerifiedDomainDid(origin);
-    console.log(domainDidResult);
-    //put in local storage
-    if (domainDidResult.status === 'failure') {
-      console.log('failure');
-      console.log(domainDidResult.error);
-      chrome.storage.local.set({
-        [origin]: {
-          origin: origin,
-          did: undefined,
-        } satisfies LinkedIdentifier,
-      });
-      return;
-    }
-    console.log('putting origin');
-    //we store keyed on both origin and did
-    //cus sometimes we only have one or the other
-    //should probably use a better storage solution with indexes or something
-    const identifier: LinkedIdentifier = {
-      origin: origin,
-      did: domainDidResult.did,
-    };
-    await chrome.storage.local.set({
-      [origin]: identifier,
-    });
-    await chrome.storage.local.set({
-      [domainDidResult.did]: identifier,
-    });
-
-    console.log('drawing early 2');
-    const canvas = new OffscreenCanvas(32, 32);
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      //its fiiine
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
-      jdenticonDrawIcon(ctx, domainDidResult.did, 32, {
-        // backColor: '#fff',
-      });
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
-      const imageData = ctx.getImageData(4, 4, 24, 24);
+  if (changeInfo.status == 'complete' && tab.active) {
+    if(!tab.url || tab.url.startsWith('chrome://')) {
       chrome.action.setIcon({
         tabId: tabId,
-        imageData: imageData,
+        path: 'icon-32.png',
       });
+      return
     }
 
-    //padlock has 3 states:
-    //unknown - either there's not a wellknown did, there is a did but it doesn't validate, or there is a did but we don't have any assertions for it
-    //known - has a did with some associated assertions (not necessarily possible in theory)
-    //trusted - the user has marked this did as "trusted" either directly or by proxy through trust estabilishment
-    //if don't find it display
+    console.log(tab.url)
+    await saveOrigin(tabId, tab.url)
   }
 
   //this should send an originActivated event when the currently active tab loads a new origin
-  if (tab.active && tab.status === 'complete' && tab.url) {
-    console.log('switched tabs');
-
-    const { hostname, origin, host } = new URL(tab.url);
-
-    chrome.storage.local.get(origin).then(async (state) => {
-      const originState: LinkedIdentifier = state[origin];
-      //todo: set icon
-      if (!originState.did) {
-        await chrome.runtime.sendMessage({
-          type: 'originActivated',
-          payload: {
-            origin: originState.origin,
-            didProfile: undefined,
-          },
-        } satisfies OriginActivated);
-        return;
-      }
-      console.log(state);
-      const triples = await graph.get<AssertionSetTriple>({
-        subject: originState.did,
-      });
-      //this has dupes in it.. i think its fine
-      const topics = triples.flatMap((triple) => triple.predicate);
-      //because this should dedupe for us
-      //ugly cast here
-      const schemas: Record<string, JsonSchema> =
-        await chrome.storage.local.get(topics);
-      console.log(triples);
-      console.log(originState.origin);
-      await chrome.runtime.sendMessage({
-        type: 'originActivated',
-        payload: {
-          origin: originState.origin,
-          didProfile: {
-            did: originState.did,
-            assertions: triples,
-            schemas,
-          },
-        },
-      } satisfies OriginActivated);
-    });
-  }
+  // if (tab.active && tab.status === 'complete' && tab.url) {
+  //   const { origin } = new URL(tab.url);
+  //
+  //   chrome.storage.local.get(origin).then(async (state) => {
+  //     const originState: LinkedIdentifier = state[origin];
+  //     //todo: set icon
+  //     if (!originState.did) {
+  //       await chrome.runtime.sendMessage({
+  //         type: 'originActivated',
+  //         payload: {
+  //           origin: originState.origin,
+  //           didProfile: undefined,
+  //         },
+  //       } satisfies OriginActivated);
+  //       return;
+  //     }
+  //
+  //     const triples = await graph.get<AssertionSetTriple>({
+  //       subject: originState.did,
+  //     });
+  //     //this has dupes in it.. i think its fine
+  //     const topics = triples.flatMap((triple) => triple.predicate);
+  //     //because this should dedupe for us
+  //     //ugly cast here
+  //     const schemas: Record<string, JsonSchema> =
+  //       await chrome.storage.local.get(topics);
+  //
+  //     await chrome.runtime.sendMessage({
+  //       type: 'originActivated',
+  //       payload: {
+  //         origin: originState.origin,
+  //         didProfile: {
+  //           did: originState.did,
+  //           assertions: triples,
+  //           schemas,
+  //         },
+  //       },
+  //     } satisfies OriginActivated);
+  //   });
+  // }
 });
 
 export type DidProfile = {
@@ -343,6 +313,7 @@ export type GetProfile = {
   type: 'getProfile';
   payload: {
     identifier: Identifier;
+    tabId: number | undefined;
   };
 };
 
@@ -417,6 +388,13 @@ export type BackgroundMessage =
   | ResolveSchemas
   | ClearState;
 
+function jsonLinks() {
+  const linkElements = document.querySelectorAll('a');
+  return Array.from(linkElements.values())
+    .filter((element) => element.href && element.href.endsWith('.json'))
+    .map((element) => element.href);
+}
+
 // Send tip to content script via messaging
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const typedMessage = message as BackgroundMessage;
@@ -425,31 +403,35 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       switch (typedMessage.payload.identifier.type) {
         //these could be collapsed together more but I'm kinda anticipating they'll diverge some more
         case 'origin': {
+          const origin = typedMessage.payload.identifier.origin
+          const tabId = typedMessage.payload.tabId
           getLinkedIdentifierByOrigin(
             typedMessage.payload.identifier.origin,
           ).then(async (linkedIdentifier) => {
-            if (!linkedIdentifier) {
+            const identifier = linkedIdentifier ?? (tabId ? await saveOrigin(tabId, origin) : undefined)
+
+            if (!identifier ) {
               sendResponse({
                 type: 'profile',
                 payload: undefined,
               } satisfies GetProfileResponse);
               return;
             }
-            if (!linkedIdentifier.did) {
+            if (!identifier.did) {
               sendResponse({
                 type: 'profile',
                 payload: {
-                  origin: linkedIdentifier.origin,
+                  origin: identifier.origin,
                   didProfile: undefined,
                 },
               } satisfies GetProfileResponse);
               return;
             }
-            const didProfile = await getDidProfile(linkedIdentifier.did);
+            const didProfile = await getDidProfile(identifier.did);
             sendResponse({
               type: 'profile',
               payload: {
-                origin: linkedIdentifier.origin,
+                origin: identifier.origin,
                 didProfile,
               },
             } satisfies GetProfileResponse);
@@ -532,14 +514,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const activeTabUrl = activeTab.url;
         if (!activeTab.id || !activeTabUrl) return;
 
-        const response: GetLinksResponse = await chrome.tabs.sendMessage(
-          activeTab.id,
-          { type: 'getLinks' } satisfies ContentMessage,
-        );
+        const result = await chrome.scripting.executeScript({
+          target : {tabId : activeTab.id},
+          func : jsonLinks,
+        });
+
+        const links = result[0].result
 
         //todo should if check current page is a trust doc .e.g .json file
         //fetch all the .json links on the page
-        const ofOrigin = response.payload.links.flatMap((link) => {
+        const ofOrigin = links.flatMap((link) => {
           const pageUrl = new URL(activeTabUrl);
           const linkUrl = new URL(link);
 

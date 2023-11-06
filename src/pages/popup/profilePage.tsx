@@ -7,11 +7,12 @@ import {
 import { Profile } from '@/pages/background';
 import { DidIcon } from '@/components/didIcon';
 import {
-  ChevronLeftIcon,
-  QuestionMarkCircledIcon,
+  ChevronLeftIcon, DrawingPinIcon,
+  QuestionMarkCircledIcon, SewingPinIcon,
 } from '@radix-ui/react-icons';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 
 export type ProfileProps = {
   onOtherProfileSelected: (did: string) => void;
@@ -20,6 +21,8 @@ export type ProfileProps = {
     origin: string | undefined; //should be origin?
     did: string | undefined;
   };
+  hasTabsPermission: boolean;
+  onPermissionsGranted: () => void;
   onPrev: () => void;
 };
 
@@ -35,6 +38,7 @@ export default function ProfilePage({
   const [selectedAssertionSet, setSelectedAssertionSet] = useState<
     string | null
   >(null);
+
   if (!profile) {
     return <p>loading...</p>;
   }
@@ -77,8 +81,8 @@ export default function ProfilePage({
       >
         <ChevronLeftIcon />
       </Button>
-      <div className={'z-10 flex flex-col items-center space-y-2 mb-5 -mt-4'}>
-        <div className={'flex items-center justify-center h-8 w-[100%]'}>
+      <div className={'z-10 flex flex-col items-center mb-5 -mt-4'}>
+        <div className={'flex items-center justify-center h-8 w-[100%] mb-2'}>
           {selectedAssertionSet && (
             <DidIcon
               className={'w-8 h-8 mr-1 animate-in fade-in'}
@@ -99,11 +103,37 @@ export default function ProfilePage({
               unknown
             </p>
           )}
+          {
+          !props.hasTabsPermission && prevProfile === undefined && <TooltipProvider>
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger className={''} asChild>
+                <Button onClick={() => {
+                  chrome.permissions.request({
+                    permissions: ['tabs'],
+                  }, (granted) => {
+                    // The callback argument will be true if the user granted the permissions.
+                    if (granted) {
+                      props.onPermissionsGranted()
+                    } else {
+
+                    }
+                  });
+                }
+                } size={'icon'} variant={'ghost'} className={'z-50 w-6 h-6 ml-1 -mr-7'}><DrawingPinIcon/></Button>
+              </TooltipTrigger>
+              <TooltipContent className={'DidTooltipContent'}>
+                <p className={'max-h-[80px] max-w-[230px] text-xs'}>
+                  Show preview in extension icon - this requires extra permissions
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          }
         </div>
 
         {!selectedAssertionSet && (
           <DidIcon
-            className={'w-32 h-32 animate-in fade-in'}
+            className={'w-32 h-32 animate-in fade-in mb-2'}
             did={profile.didProfile.did}
           />
         )}

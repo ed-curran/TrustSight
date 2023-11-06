@@ -31,21 +31,13 @@ export default defineManifest(async (env) => ({
   icons: {
     '128': 'icon-128.png',
   },
-  permissions: ['activeTab', 'tabs', 'storage', 'unlimitedStorage'],
-  // optional_permissions: [ "tabs", ],
-  content_scripts: [
-    {
-      matches: ['http://*/*', 'https://*/*', '<all_urls>'],
-      js: ['src/pages/content/index.tsx'],
-      css: ['contentStyle.css'],
-    },
-  ],
+  permissions: ['activeTab', 'scripting', 'storage'],
+  optional_permissions: ["tabs"],
   web_accessible_resources: [
     {
       resources: [
-        'contentStyle.css',
         'icon-128.png',
-        'icon-34.png',
+        'icon-32.png',
         'badge.png',
         'badge-alert.png',
         'badge-check.png',
