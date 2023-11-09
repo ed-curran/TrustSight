@@ -240,7 +240,7 @@ function TrustDocList({
                   {uniqueSubjectsCount}
                 </p>
                 <p className="font-medium text-muted-foreground mb-1">topics</p>
-                <ul className={'mb-2'}>
+                <ul className={'mb-2 space-y-2'}>
                   {topics.map(({ id, title }) => (
                     <li key={id}>
                       <p className={'font-bold leading-none tracking-tight'}>

@@ -41,7 +41,8 @@ async function getVerifiedDomainDid(
   //i find it annoying that this doesn't extract useful information like the dids and origin for us
   //it also doesn't provide a way to verify that the origin in the linkedDids credentials matches the origin we expect.
   //Which is weird. So we have to do that ourselves.
-  const result = await newVerifier().verifyResource({
+  const verifier = await newVerifier()
+  const result = await verifier.verifyResource({
     configuration: didConfiguration,
   });
 
@@ -185,12 +186,26 @@ async function saveOrigin(tabId: number, url: string): Promise<LinkedIdentifier>
   console.log(domainDidResult)
   //put in local storage
   if (domainDidResult.status === 'failure') {
-    const identifier: LinkedIdentifier = {
+    const previousIdentifier = await getLinkedIdentifierByOrigin(origin)
+    const newIdentifier: LinkedIdentifier = {
         origin: origin,
         did: undefined,
       }
-    chrome.storage.local.set(identifier);
-    return identifier;
+    if(previousIdentifier) {
+      await chrome.storage.local.set({
+        [origin]: newIdentifier,
+      });
+    }
+    if(previousIdentifier?.did) {
+      await chrome.storage.local.set({
+        [previousIdentifier.did]: newIdentifier,
+      });
+    }
+    await chrome.action.setIcon({
+      tabId: tabId,
+      path: 'question-mark-circled-32.png',
+    });
+    return newIdentifier;
   }
   //we store keyed on both origin and did
   //cus sometimes we only have one or the other

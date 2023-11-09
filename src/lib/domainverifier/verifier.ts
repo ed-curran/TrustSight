@@ -1,47 +1,77 @@
 //from https://github.com/Sphereon-Opensource/wellknown-did-client/blob/develop/test/resources/verifiers/VcJsVerifier.ts
 import {
-  ISignedDomainLinkageCredential,
   IVerifyCallbackArgs,
-  IVerifyCredentialResult,
-  ProofFormatTypesEnum,
   WellKnownDidVerifier,
 } from '@sphereon/wellknown-dids-client';
+import {veramoAgent, VeramoAgent} from '@/lib/veramo/veramoAgent'
 
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-import { Ed25519Signature2020 } from '@digitalbazaar/ed25519-signature-2020';
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-import { Ed25519VerificationKey2020 } from '@digitalbazaar/ed25519-verification-key-2020';
-import { DocumentLoader } from './documentLoader';
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-import * as vc from '@digitalbazaar/vc';
+// export async function verifyVc(
+//   args: IVerifyCallbackArgs,
+// ): Promise<IVerifyCredentialResult> {
+//   const keyPair = await Ed25519VerificationKey2020.generate();
+//   const suite = new Ed25519Signature2020({ key: keyPair });
+//
+//   if (args.proofFormat === ProofFormatTypesEnum.JSON_LD) {
+//     suite.verificationMethod = (
+//       args.credential as ISignedDomainLinkageCredential
+//     ).credentialSubject.id;
+//
+//     // return await vc.verifyCredential({
+//     //   credential: args.credential,
+//     //   suite,
+//     //   documentLoader: new DocumentLoader().getLoader(),
+//     // });
+//     return {
+//       verified: true
+//     }
+//   }
+//
+//   //todo do vc-jwt verification
+//
+//   return {
+//     verified: false,
+//   };
+// }
 
-export async function verifyVc(
-  args: IVerifyCallbackArgs,
-): Promise<IVerifyCredentialResult> {
-  const keyPair = await Ed25519VerificationKey2020.generate();
-  const suite = new Ed25519Signature2020({ key: keyPair });
-
-  if (args.proofFormat === ProofFormatTypesEnum.JSON_LD) {
-    suite.verificationMethod = (
-      args.credential as ISignedDomainLinkageCredential
-    ).credentialSubject.id;
-
-    return await vc.verifyCredential({
-      credential: args.credential,
-      suite,
-      documentLoader: new DocumentLoader().getLoader(),
-    });
+export function getVerifyCallback(agent: VeramoAgent) {
+  return async (args: IVerifyCallbackArgs) => {
+    const result = await agent.verifyCredential({credential: args.credential })
+    return {
+      verified: result.verified
+    }
   }
-
-  //todo do vc-jwt verification
-
-  return {
-    verified: false,
-  };
 }
 
-export const newVerifier = () =>
-  new WellKnownDidVerifier({ verifySignatureCallback: verifyVc });
+// export async function verifyVcVeramo(
+//   args: IVerifyCallbackArgs,
+// ): Promise<IVerifyCredentialResult> {
+//   const keyPair = await Ed25519VerificationKey2020.generate();
+//   const suite = new Ed25519Signature2020({ key: keyPair });
+//
+//   if (args.proofFormat === ProofFormatTypesEnum.JSON_LD) {
+//     suite.verificationMethod = (
+//       args.credential as ISignedDomainLinkageCredential
+//     ).credentialSubject.id;
+//
+//     // return await vc.verifyCredential({
+//     //   credential: args.credential,
+//     //   suite,
+//     //   documentLoader: new DocumentLoader().getLoader(),
+//     // });
+//     return {
+//       verified: true
+//     }
+//   }
+//
+//   //todo do vc-jwt verification
+//
+//   return {
+//     verified: false,
+//   };
+// }
+
+export const newVerifier = async () => {
+  const agent = await veramoAgent()
+  const verify = getVerifyCallback(agent)
+  return new WellKnownDidVerifier({ verifySignatureCallback: verify });
+}
