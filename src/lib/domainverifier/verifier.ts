@@ -33,11 +33,19 @@ import {veramoAgent, VeramoAgent} from '@/lib/veramo/veramoAgent'
 //   };
 // }
 
-export function getVerifyCallback(agent: VeramoAgent) {
+export function getVerifyCredentialCallback(agent: VeramoAgent) {
   return async (args: IVerifyCallbackArgs) => {
-    const result = await agent.verifyCredential({credential: args.credential })
-    return {
-      verified: result.verified
+
+    try {
+      const result = await agent.verifyCredential({credential: args.credential})
+      return {
+        verified: result.verified
+      }
+    } catch (e) {
+      console.log(e)
+      return {
+        verified: false
+      }
     }
   }
 }
@@ -72,6 +80,6 @@ export function getVerifyCallback(agent: VeramoAgent) {
 
 export const newVerifier = async () => {
   const agent = await veramoAgent()
-  const verify = getVerifyCallback(agent)
-  return new WellKnownDidVerifier({ verifySignatureCallback: verify });
+  const verify = getVerifyCredentialCallback(agent)
+  return new WellKnownDidVerifier({ verifySignatureCallback: verify});
 }

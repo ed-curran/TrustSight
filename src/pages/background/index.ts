@@ -1,7 +1,13 @@
+// @ts-ignore
+globalThis.regeneratorRuntime = undefined;
 import {newVerifier} from '@/lib/domainverifier/verifier';
-import {IDidConfigurationResource, ValidationStatusEnum,} from '@sphereon/wellknown-dids-client';
+import {
+  IDidConfigurationResource,
+  IJsonWebTokenProofPayload,
+  ValidationStatusEnum,
+} from '@sphereon/wellknown-dids-client';
 import {IDomainLinkageCredential} from '@sphereon/wellknown-dids-client/dist/types';
-import {verifyResourceStructure} from '@sphereon/wellknown-dids-client/dist/utils';
+import {decodeToken, verifyResourceStructure} from '@sphereon/wellknown-dids-client/dist/utils';
 import level from 'level';
 //levelgraph needs level 7.0.0, 8.0 breaks which is a shame because 8.0 actually has types
 import levelgraph from 'levelgraph';
@@ -15,6 +21,10 @@ import {
   TrustEstablishmentDoc,
 } from '@/lib/trustestablishment/trustEstablishment';
 import {drawIcon as jdenticonDrawIcon} from 'jdenticon';
+
+//bruh
+// @ts-ignore
+
 
 const db = level('trustgraph');
 const graph = promisifyLevelGraph(levelgraph(db));
@@ -33,7 +43,7 @@ async function getVerifiedDomainDid(
     `${origin}/.well-known/did-configuration.json`,
   );
   if (!didConfigurationResponse.ok) {
-    return { status: 'failure', error: 'could not find did configuration' };
+    return {status: 'failure', error: 'could not find did configuration'};
   }
   //todo error handling when we get a weird did configuration
   const didConfiguration = await didConfigurationResponse.json();
@@ -47,25 +57,23 @@ async function getVerifiedDomainDid(
   });
 
   console.log(result.credentials)
-  if (
-    !result.credentials ||
-    result.credentials.length === 0 ||
-    result.credentials[0].status === ValidationStatusEnum.INVALID
-  )
+  //we use the first valid linkage credential that we find
+  const validCredentialIndex = result.credentials?.findIndex((credential) => credential.status === ValidationStatusEnum.VALID)
+  if (!validCredentialIndex) {
     return {
       status: 'failure',
       error: 'No valid domain linked credential found',
     };
+  }
 
+  //this well-known did client does not make it easy to get any useful information out after a verification
   const validatedConfiguration = didConfiguration as IDidConfigurationResource;
+  const validJwtOrLdCredential = validatedConfiguration.linked_dids[validCredentialIndex]
+  const validCredential = (typeof validJwtOrLdCredential === 'string' ? (decodeToken(validJwtOrLdCredential, false) as IJsonWebTokenProofPayload).vc : validJwtOrLdCredential) as IDomainLinkageCredential
 
-  //todo can be multiple dids, and need to be able to parse vc-jwt
-  const did = (
-    validatedConfiguration.linked_dids[0] as IDomainLinkageCredential
-  ).credentialSubject.id;
-  const foundOrigin = (
-    validatedConfiguration.linked_dids[0] as IDomainLinkageCredential
-  ).credentialSubject.origin;
+  console.log(validCredential)
+  const did = validCredential.credentialSubject.id;
+  const foundOrigin = validCredential.credentialSubject.origin;
   if (foundOrigin !== origin)
     return {
       status: 'failure',
@@ -127,7 +135,7 @@ async function getLinkedIdentifierByDid(
 }
 
 async function getOriginDetails(url: string): Promise<Profile> {
-  const { origin } = new URL(url);
+  const {origin} = new URL(url);
 
   const state = await chrome.storage.local.get(origin);
   const originState: LinkedIdentifier = state[origin];
@@ -159,6 +167,7 @@ async function getOriginDetails(url: string): Promise<Profile> {
     },
   };
 }
+
 chrome.tabs.onActivated.addListener(function (tab) {
   // chrome.runtime.sendMessage({
   //   type: 'originActivated',
@@ -180,7 +189,7 @@ chrome.tabs.onActivated.addListener(function (tab) {
 });
 
 async function saveOrigin(tabId: number, url: string): Promise<LinkedIdentifier> {
-  const { origin } = new URL(url);
+  const {origin} = new URL(url);
   //todo: check for cached origin
   const domainDidResult = await getVerifiedDomainDid(origin);
   console.log(domainDidResult)
@@ -188,15 +197,15 @@ async function saveOrigin(tabId: number, url: string): Promise<LinkedIdentifier>
   if (domainDidResult.status === 'failure') {
     const previousIdentifier = await getLinkedIdentifierByOrigin(origin)
     const newIdentifier: LinkedIdentifier = {
-        origin: origin,
-        did: undefined,
-      }
-    if(previousIdentifier) {
+      origin: origin,
+      did: undefined,
+    }
+    if (previousIdentifier) {
       await chrome.storage.local.set({
         [origin]: newIdentifier,
       });
     }
-    if(previousIdentifier?.did) {
+    if (previousIdentifier?.did) {
       await chrome.storage.local.set({
         [previousIdentifier.did]: newIdentifier,
       });
@@ -248,7 +257,7 @@ chrome.tabs.onUpdated.addListener(async function (tabId, changeInfo, tab) {
   //basically we're having to deal with how to do cache invalidation for origins
   //my plan is just to reuse cached origins untill no tabs are using that origin and then unload it
   if (changeInfo.status == 'complete' && tab.active) {
-    if(!tab.url || tab.url.startsWith('chrome://')) {
+    if (!tab.url || tab.url.startsWith('chrome://')) {
       chrome.action.setIcon({
         tabId: tabId,
         path: 'icon-32.png',
@@ -316,13 +325,13 @@ export type Profile = {
 
 export type Identifier =
   | {
-      type: 'did';
-      did: string;
-    }
+  type: 'did';
+  did: string;
+}
   | {
-      type: 'origin';
-      origin: string;
-    };
+  type: 'origin';
+  origin: string;
+};
 
 export type GetProfile = {
   type: 'getProfile';
@@ -360,13 +369,13 @@ export type ResolveSchemasResponse = {
   type: 'resolveSchemasResponse';
   payload:
     | {
-        status: 'success';
-        schemas: JsonSchema[];
-      }
+    status: 'success';
+    schemas: JsonSchema[];
+  }
     | {
-        status: 'failure';
-        error: string;
-      };
+    status: 'failure';
+    error: string;
+  };
 };
 
 export type ImportDoc = {
@@ -425,7 +434,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           ).then(async (linkedIdentifier) => {
             const identifier = linkedIdentifier ?? (tabId ? await saveOrigin(tabId, origin) : undefined)
 
-            if (!identifier ) {
+            if (!identifier) {
               sendResponse({
                 type: 'profile',
                 payload: undefined,
@@ -501,7 +510,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             graph.put(toTriples(typedMessage.payload.doc)).then(() => {
               sendResponse({
                 type: 'importDocResponse',
-                payload: { err: undefined },
+                payload: {err: undefined},
               } satisfies ImportDocResponse);
             });
           },
@@ -511,7 +520,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             //todo: could partially import and just skipping the missing topic
             sendResponse({
               type: 'importDocResponse',
-              payload: { err: err.toString() },
+              payload: {err: err.toString()},
             } satisfies ImportDocResponse);
           },
         );
@@ -525,13 +534,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       //fetching them and seeing if they're valid trust docs
       //there's probably a better way to do this...
       //we also try to resolve any topic schemas that the doc references
-      chrome.tabs.query({ active: true }).then(async ([activeTab]) => {
+      chrome.tabs.query({active: true}).then(async ([activeTab]) => {
         const activeTabUrl = activeTab.url;
         if (!activeTab.id || !activeTabUrl) return;
 
         const result = await chrome.scripting.executeScript({
-          target : {tabId : activeTab.id},
-          func : jsonLinks,
+          target: {tabId: activeTab.id},
+          func: jsonLinks,
         });
 
         const links = result[0].result
@@ -598,13 +607,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         (schemas) => {
           sendResponse({
             type: 'resolveSchemasResponse',
-            payload: { status: 'success', schemas },
+            payload: {status: 'success', schemas},
           } satisfies ResolveSchemasResponse);
         },
         (e) => {
           sendResponse({
             type: 'resolveSchemasResponse',
-            payload: { status: 'failure', error: e.toString() },
+            payload: {status: 'failure', error: e.toString()},
           } satisfies ResolveSchemasResponse);
         },
       );

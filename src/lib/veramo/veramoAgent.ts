@@ -32,7 +32,7 @@ import { getResolver as webDidResolver } from 'web-did-resolver'
 import { getResolver as keyDidResolver } from 'key-did-resolver';
 
 import { CredentialPlugin } from '@veramo/credential-w3c';
-import { CredentialIssuerLD, VeramoEd25519Signature2018, LdDefaultContexts } from '@veramo/credential-ld';
+import { CredentialIssuerLD } from '@veramo/credential-ld';
 
 // Storage plugin using TypeOrm
 import { Entities, KeyStore, DIDStore, PrivateKeyStore, migrations } from '@veramo/data-store'
@@ -85,30 +85,29 @@ export const veramoAgent = async (environmentName?: string) => {
     plugins: [
       new DIDResolverPlugin({ resolver: new Resolver({...webDidResolver(), ...keyDidResolver()})}),
       new CredentialPlugin(),
-      new CredentialIssuerLD({
-        contextMaps: [
-          LdDefaultContexts,
-          {
-            'https://identity.foundation/.well-known/did-configuration/v1': {
-              '@context': [
-                {
-                  '@version': 1.1,
-                  '@protected': true,
-                  LinkedDomains:
-                    'https://identity.foundation/.well-known/resources/did-configuration/#LinkedDomains',
-                  DomainLinkageCredential:
-                    'https://identity.foundation/.well-known/resources/did-configuration/#DomainLinkageCredential',
-                  origin:
-                    'https://identity.foundation/.well-known/resources/did-configuration/#origin',
-                  linked_dids:
-                    'https://identity.foundation/.well-known/resources/did-configuration/#linked_dids',
-                },
-              ],
-            },
-          },
-        ],
-        suites: [new VeramoEd25519Signature2018()],
-      }),
+      // new CredentialIssuerLD({
+      //   contextMaps: [
+      //     {
+      //       'https://identity.foundation/.well-known/did-configuration/v1': {
+      //         '@context': [
+      //           {
+      //             '@version': 1.1,
+      //             '@protected': true,
+      //             LinkedDomains:
+      //               'https://identity.foundation/.well-known/resources/did-configuration/#LinkedDomains',
+      //             DomainLinkageCredential:
+      //               'https://identity.foundation/.well-known/resources/did-configuration/#DomainLinkageCredential',
+      //             origin:
+      //               'https://identity.foundation/.well-known/resources/did-configuration/#origin',
+      //             linked_dids:
+      //               'https://identity.foundation/.well-known/resources/did-configuration/#linked_dids',
+      //           },
+      //         ],
+      //       },
+      //     },
+      //   ],
+      //   suites: [],
+      // }),
     ],
   });
 };
