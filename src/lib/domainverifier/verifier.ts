@@ -1,8 +1,5 @@
 //from https://github.com/Sphereon-Opensource/wellknown-did-client/blob/develop/test/resources/verifiers/VcJsVerifier.ts
-import {
-  IVerifyCallbackArgs,
-  WellKnownDidVerifier,
-} from '@sphereon/wellknown-dids-client';
+import {IVerifyCallbackArgs, ProofFormatTypesEnum, WellKnownDidVerifier,} from '@sphereon/wellknown-dids-client';
 import {veramoAgent, VeramoAgent} from '@/lib/veramo/veramoAgent'
 
 // export async function verifyVc(
@@ -34,8 +31,14 @@ import {veramoAgent, VeramoAgent} from '@/lib/veramo/veramoAgent'
 // }
 
 export function getVerifyCredentialCallback(agent: VeramoAgent) {
+  const formats = agent.listUsableProofFormats()
   return async (args: IVerifyCallbackArgs) => {
-
+    //can't verify JSON-LD yet
+    if(args.proofFormat === ProofFormatTypesEnum.JSON_LD) {
+      return {
+        verified: false
+      }
+    }
     try {
       const result = await agent.verifyCredential({credential: args.credential})
       return {
