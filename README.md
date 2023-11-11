@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="460" height="300" src="./trust-sight-128.png">
+  <img width="128" height="128" src="./trust-sight-128.png">
 </p>
 
 # TrustSight - The trust overlay for your browser.
