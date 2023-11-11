@@ -24,13 +24,15 @@ any [Trust Establishment Documents](https://identity.foundation/trust-establishm
 
 It's easy to import a trust establishment document. Simply open up TrustSight, 
 and in the import tab you will see any trust documents that have been published by the current site you are viewing.
-Use it when a site you trust has indicated that it has trust documents available.
+Use it when a site you trust indicates that it has trust documents available.
 
 Additionally, it's possible to import trust establishment documents manually, by providing either a link to a document or a raw document as json. 
 Probably only do this if you know what you are doing.
 
 ## Development
-For development and bundling we're using https://crxjs.dev/vite-plugin
+For development and bundling we're using [CRXJS with vite](https://crxjs.dev/vite-plugin).
+
+For the UI we're using React, [Tailwind](https://tailwindcss.com/) and [shadcn/ui](https://ui.shadcn.com/).
 
 Dev
 
