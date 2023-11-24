@@ -2,36 +2,7 @@
 import {IVerifyCallbackArgs, ProofFormatTypesEnum, WellKnownDidVerifier,} from '@sphereon/wellknown-dids-client';
 import {veramoAgent, VeramoAgent} from '@/lib/veramo/veramoAgent'
 
-// export async function verifyVc(
-//   args: IVerifyCallbackArgs,
-// ): Promise<IVerifyCredentialResult> {
-//   const keyPair = await Ed25519VerificationKey2020.generate();
-//   const suite = new Ed25519Signature2020({ key: keyPair });
-//
-//   if (args.proofFormat === ProofFormatTypesEnum.JSON_LD) {
-//     suite.verificationMethod = (
-//       args.credential as ISignedDomainLinkageCredential
-//     ).credentialSubject.id;
-//
-//     // return await vc.verifyCredential({
-//     //   credential: args.credential,
-//     //   suite,
-//     //   documentLoader: new DocumentLoader().getLoader(),
-//     // });
-//     return {
-//       verified: true
-//     }
-//   }
-//
-//   //todo do vc-jwt verification
-//
-//   return {
-//     verified: false,
-//   };
-// }
-
 export function getVerifyCredentialCallback(agent: VeramoAgent) {
-  const formats = agent.listUsableProofFormats()
   return async (args: IVerifyCallbackArgs) => {
     //can't verify JSON-LD yet
     if(args.proofFormat === ProofFormatTypesEnum.JSON_LD) {

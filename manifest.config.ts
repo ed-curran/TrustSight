@@ -31,7 +31,7 @@ export default defineManifest(async (env) => ({
   icons: {
     '128': 'icon-128.png',
   },
-  permissions: ['activeTab', 'scripting', 'storage'],
+  permissions: ['activeTab', 'scripting', 'storage', 'alarms'],
   optional_permissions: ["tabs"],
   web_accessible_resources: [
     {
@@ -45,4 +45,7 @@ export default defineManifest(async (env) => ({
       matches: [],
     },
   ],
+  content_security_policy: {
+    extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';",
+  }
 }))

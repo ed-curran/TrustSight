@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   fetchDoc,
   JsonSchema,
@@ -8,21 +8,23 @@ import {
   TrustDocSummary,
   TrustEstablishmentDoc,
 } from '@/lib/trustestablishment/trustEstablishment';
-import { TrashIcon } from '@radix-ui/react-icons';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
+import {TrashIcon, SymbolIcon} from '@radix-ui/react-icons';
+import {Button} from '@/components/ui/button';
+import {Separator} from '@/components/ui/separator';
 import {
   BackgroundMessage,
   ClearState,
   FindDocsResponse,
   ImportDoc,
-  ImportDocResponse,
+  ImportDocResponse, RefreshDOcs,
   ResolveSchemas,
   ResolveSchemasResponse,
 } from '@/pages/background';
-import { DidIcon } from '@/components/didIcon';
-import { Textarea } from '@/components/ui/textarea';
-import { cx } from 'class-variance-authority';
+import {DidIcon} from '@/components/didIcon';
+import {Textarea} from '@/components/ui/textarea';
+import {cx} from 'class-variance-authority';
+import {useToast} from '@/components/ui/use-toast'
+import {ToastAction} from '@/components/ui/toast'
 
 export type TrustDocImporterProps = {
   origin: string;
@@ -45,27 +47,36 @@ export const TrustDocImporter = (props: TrustDocImporterProps) => {
 
   useEffect(() => {
     chrome.runtime
-      .sendMessage({ type: 'findDocs' } satisfies BackgroundMessage)
+      .sendMessage({type: 'findDocs'} satisfies BackgroundMessage)
       .then((response: FindDocsResponse) => {
         const topicSchemas = new Map(
           response.payload.schemas.map((schema) => [schema.$id, schema]),
         );
-        const docs = response.payload.docs.map((doc) => ({
+        console.log(response.payload.docs)
+        const docs = response.payload.docs.map((docContainer) => ({
           imported: false,
           error: undefined,
-          ...summariseDoc(doc, topicSchemas),
+          source: docContainer.source,
+          ...summariseDoc(docContainer.doc, topicSchemas),
         }));
         setTrustDocs(docs);
         setTopicSchemas(topicSchemas);
       });
   }, []);
 
-  const importDoc = async (doc: TrustEstablishmentDoc, index: number) => {
+  const importDoc = async (doc: TrustEstablishmentDoc, source: string | undefined, index: number) => {
     const response: ImportDocResponse = await chrome.runtime.sendMessage({
       type: 'importDoc',
-      payload: { doc },
+      payload: {doc, source},
     } satisfies ImportDoc);
 
+    // if(!response.payload.err) {
+    //   chrome.permissions.request({
+    //     origins: ['tabs'],
+    //   }, (granted) => {
+    //
+    //   }
+    // }
     setTrustDocs((docs) => {
       if (!docs) return null;
       const current = docs[index];
@@ -84,10 +95,10 @@ export const TrustDocImporter = (props: TrustDocImporterProps) => {
     });
   };
 
-  const importDocManual = async (doc: TrustEstablishmentDoc, index: number) => {
+  const importDocManual = async (doc: TrustEstablishmentDoc, source: string | undefined, index: number) => {
     const response: ImportDocResponse = await chrome.runtime.sendMessage({
       type: 'importDoc',
-      payload: { doc },
+      payload: {doc, source},
     } satisfies ImportDoc);
 
     setTrustDocsManual((docs) => {
@@ -107,6 +118,7 @@ export const TrustDocImporter = (props: TrustDocImporterProps) => {
     });
   };
 
+  const {toast} = useToast()
   const [mode, setMode] = useState<'domain' | 'manual'>('domain');
   return (
     <>
@@ -131,24 +143,55 @@ export const TrustDocImporter = (props: TrustDocImporterProps) => {
             {mode === 'domain' ? '(switch to manual)' : '(switch to automatic)'}
           </Button>
         </div>
-        {mode === 'manual' && (
-          <Button
-            className={'h-6 w-6'}
-            size={'icon'}
-            variant={'destructive'}
-            onClick={() => {
-              chrome.runtime.sendMessage({ type: 'clearState' } as ClearState).then(() => chrome.permissions.remove({
-                permissions: ['tabs']
-              }))
-            }}
-          >
-            <TrashIcon />
-          </Button>
-        )}
+        <div className={'space-x-2'}>
+          {mode === 'manual' && (
+            <>
+              <Button
+                className={'h-6 w-6'}
+                size={'icon'}
+                variant={'ghost'}
+                onClick={() => {
+                  chrome.runtime.sendMessage({type: 'refreshDocs'} as RefreshDOcs).then(() => {
+                    toast({description: "Trust Documents Refreshed"})
+                  })
+                }}
+              >
+                <SymbolIcon/>
+              </Button>
+
+              <Button
+                className={'h-6 w-6'}
+                size={'icon'}
+                variant={'destructive'}
+                onClick={() => {
+
+                  toast({
+                    description: "Are you sure you want to delete all imported trust docs?",
+                    variant: 'destructive',
+                    duration: 5000,
+                    action: (
+                      <ToastAction altText="Goto schedule to undo" onClick={() => {
+                        chrome.runtime.sendMessage({type: 'clearState'} as ClearState).then(() => chrome.permissions.remove({
+                          permissions: ['tabs']
+                        })).then(() => {
+                          toast({description: "Trust Documents Deleted", duration: 1000})
+                        })
+                      }
+                      }>Delete</ToastAction>
+                    ),
+                  })
+
+                }}
+              >
+                <TrashIcon/>
+              </Button>
+            </>
+          )}
+        </div>
       </div>
       {mode === 'domain' ? (
         trustDocs ? (
-          <TrustDocList trustDocs={trustDocs} onImport={importDoc} />
+          <TrustDocList trustDocs={trustDocs} onImport={importDoc}/>
         ) : (
           <p className={'ml-2 mt-2'}>searching current page...</p>
         )
@@ -167,7 +210,7 @@ export const TrustDocImporter = (props: TrustDocImporterProps) => {
                 });
               }}
             />
-            <Separator className={''} />
+            <Separator className={''}/>
           </div>
           <TrustDocList
             trustDocs={trustDocsManual}
@@ -182,12 +225,12 @@ export const TrustDocImporter = (props: TrustDocImporterProps) => {
 };
 
 function TrustDocList({
-  trustDocs,
-  onImport,
-  ...props
-}: {
+                        trustDocs,
+                        onImport,
+                        ...props
+                      }: {
   trustDocs: TrustDocImport[];
-  onImport: (trustDoc: TrustEstablishmentDoc, index: number) => void;
+  onImport: (trustDoc: TrustEstablishmentDoc, source: string | undefined, index: number) => void;
   className?: string;
 }) {
   if (trustDocs.length === 0) {
@@ -199,6 +242,7 @@ function TrustDocList({
         (
           {
             doc,
+            source,
             imported,
             error,
             topics,
@@ -212,15 +256,15 @@ function TrustDocList({
               <div
                 className={'col-span-2 space-y-2 flex flex-col items-center'}
               >
-                <DidIcon did={doc.author} className={'w-12 h-12 -ml-1'} />
-                <p>{doc.version}</p>
+                <DidIcon did={doc.author} className={'w-12 h-12 -ml-1'}/>
+                <p>v{doc.version}</p>
                 {imported ? (
                   <p>imported</p>
                 ) : error ? (
                   <p>{error}</p>
                 ) : (
                   <Button
-                    onClick={() => onImport(doc, index)}
+                    onClick={() => onImport(doc, source, index)}
                     size={'sm'}
                     variant={'secondary'}
                   >
@@ -229,10 +273,6 @@ function TrustDocList({
                 )}
               </div>
               <div className={'col-span-6 pl-2'}>
-                <p className="font-medium text-muted-foreground mb-1">id</p>
-                <p className={'font-bold leading-none tracking-tight mb-2'}>
-                  {doc.id}
-                </p>
                 <p className="font-medium text-muted-foreground mb-1">
                   subjects
                 </p>
@@ -241,7 +281,7 @@ function TrustDocList({
                 </p>
                 <p className="font-medium text-muted-foreground mb-1">topics</p>
                 <ul className={'mb-2 space-y-2'}>
-                  {topics.map(({ id, title }) => (
+                  {topics.map(({id, title}) => (
                     <li key={id}>
                       <p className={'font-bold leading-none tracking-tight'}>
                         {title}
@@ -251,7 +291,7 @@ function TrustDocList({
                 </ul>
               </div>
             </div>
-            <Separator />
+            <Separator/>
           </li>
         ),
       )}
@@ -263,11 +303,13 @@ type AddTrustDocProps = {
   onAdded: (trustDocSummary: TrustDocSummary) => void;
   className?: string;
 };
-function AddTrustDocForm({ onAdded, ...props }: AddTrustDocProps) {
+
+function AddTrustDocForm({onAdded, ...props}: AddTrustDocProps) {
   const [error, setError] = useState<string | null>(null);
   const add = async (docJsonOrLink: string) => {
-    const result = docJsonOrLink.startsWith('http')
-      ? await fetchDoc(docJsonOrLink, undefined)
+    const source = docJsonOrLink.startsWith('http') ? docJsonOrLink : undefined
+    const result = source
+      ? await fetchDoc(source, undefined)
       : parseDoc(docJsonOrLink);
 
     if (result.status === 'failure') {
@@ -280,7 +322,7 @@ function AddTrustDocForm({ onAdded, ...props }: AddTrustDocProps) {
     chrome.runtime
       .sendMessage({
         type: 'resolveSchemas',
-        payload: { topics },
+        payload: {topics},
       } satisfies ResolveSchemas)
       .then((response: ResolveSchemasResponse) => {
         if (response.payload.status === 'failure') {
@@ -291,7 +333,10 @@ function AddTrustDocForm({ onAdded, ...props }: AddTrustDocProps) {
           response.payload.schemas.map((schema) => [schema.$id, schema]),
         );
         const summary = summariseDoc(doc, schemas);
-        onAdded(summary);
+        onAdded({
+          source: source,
+          ...summary
+        });
         setError(null);
       });
   };

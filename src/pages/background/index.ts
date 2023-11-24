@@ -1,5 +1,5 @@
 // @ts-ignore
-globalThis.regeneratorRuntime = undefined;
+import {promisify} from 'es6-promisify'
 import {newVerifier} from '@/lib/domainverifier/verifier';
 import {
   IDidConfigurationResource,
@@ -13,26 +13,85 @@ import level from 'level';
 import levelgraph from 'levelgraph';
 import {promisifyLevelGraph} from '@/lib/levelgraph';
 import {
-  AssertionSetTriple,
+  AssertionSetTriple, fetchDoc,
   JsonSchema,
   toTopics,
   toTriples,
-  toUniqueTopics,
   TrustEstablishmentDoc,
 } from '@/lib/trustestablishment/trustEstablishment';
 import {drawIcon as jdenticonDrawIcon} from 'jdenticon';
-
-//bruh
-// @ts-ignore
-
+import {Web5} from '@web5/api';
 
 const db = level('trustgraph');
 const graph = promisifyLevelGraph(levelgraph(db));
+
+const ALARM_STORAGE_KEY = "user-preference-alarm-enabled";
+const ALARM_NAME = "refresh-alarm"
+
+
+//refresh docs every couple minutes
+async function startAlarm() {
+    const alarm = await chrome.alarms.get(ALARM_NAME);
+
+    if (!alarm) {
+      await chrome.alarms.create(ALARM_NAME, { periodInMinutes: 5});
+    }
+
+}
+refresh()
+startAlarm();
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if(alarm.name === ALARM_NAME) {
+    refresh()
+  }
+});
+
+//todo: do this on a timer
 
 export type LinkedIdentifier = {
   origin: string; //should be origin?
   did: string | undefined;
 };
+
+async function refresh() {
+  const {web5, did} = await Web5.connect()
+  const docContainers = await getDocs()
+
+  for (const [index, container] of docContainers.entries()) {
+    const doc = container.doc
+
+    if (doc.publisherDid) {
+      const {records} = await web5.dwn.records.query({
+        from: doc.publisherDid,
+        message: {
+          filter: {
+            recordId: doc.id
+          }
+        },
+      });
+
+      //todo: validation and error handling
+      const refreshedDoc: TrustEstablishmentDoc = await records?.[0]?.data.json()
+      if (refreshedDoc) {
+        //this will replace the stale doc
+        //maybe we should keep the old doc around so we can track changes
+        //this import does another get for docs which is wasteful
+        const importResult = await importDoc({doc: refreshedDoc, source: container.source}, {doc, index})
+        if(importResult.err) console.log(importResult.err)
+        else console.log(`refreshed doc: ${doc.id}`)
+      }
+    } else if(container.source) {
+      const result = await fetchDoc(container.source, undefined)
+      if(result.status === 'success') {
+        const importResult = await importDoc({doc: result.doc, source: container.source}, {doc, index})
+        if(importResult.err) console.log(importResult.err)
+        else console.log(`refreshed doc: ${doc.id}`)
+      }
+    }
+
+  }
+}
 
 async function getVerifiedDomainDid(
   origin: string,
@@ -71,19 +130,26 @@ async function getVerifiedDomainDid(
   const validJwtOrLdCredential = validatedConfiguration.linked_dids[validCredentialIndex]
   const validCredential = (typeof validJwtOrLdCredential === 'string' ? (decodeToken(validJwtOrLdCredential, false) as IJsonWebTokenProofPayload).vc : validJwtOrLdCredential) as IDomainLinkageCredential
 
-  console.log(validCredential)
   const did = validCredential.credentialSubject.id;
   const foundOrigin = validCredential.credentialSubject.origin;
   if (foundOrigin !== origin)
     return {
       status: 'failure',
-      error: 'No valid domain linked credential found',
+      error: `Domain linked credential did not match current origin: ${foundOrigin} vs ${origin}`,
     };
 
   return {
     status: 'success',
     did: did,
   };
+}
+
+export type TrustEstablishmentDocContainer = {
+  source: string | undefined
+  doc: TrustEstablishmentDoc
+}
+function getDocs(): Promise<TrustEstablishmentDocContainer[]> {
+  return chrome.storage.local.get('docs').then(result => result['docs'] ?? [])
 }
 
 async function getDidProfile(did: string): Promise<DidProfile> {
@@ -97,9 +163,18 @@ async function getDidProfile(did: string): Promise<DidProfile> {
   const schemas: Record<string, JsonSchema> =
     await chrome.storage.local.get(topics);
 
+  const triplesWithOrigin = await Promise.all(triples.map(async triple => {
+    //i assume theres in memory caching happening here riiight
+    const identifier = await getLinkedIdentifierByDid(triple.object)
+    return {
+      ...triple,
+      origin: identifier?.origin
+    }
+  }))
+
   return {
     did: did,
-    assertions: triples,
+    assertions: triplesWithOrigin,
     schemas,
   };
 }
@@ -134,67 +209,13 @@ async function getLinkedIdentifierByDid(
   return state[did];
 }
 
-async function getOriginDetails(url: string): Promise<Profile> {
-  const {origin} = new URL(url);
-
-  const state = await chrome.storage.local.get(origin);
-  const originState: LinkedIdentifier = state[origin];
-
-  //todo: set icon
-  if (!originState.did) {
-    return {
-      origin: originState.origin,
-      didProfile: undefined,
-    };
-  }
-
-  const triples = await graph.get<AssertionSetTriple>({
-    subject: originState.did,
-  });
-  //this has dupes in it.. i think its fine
-  const topics = triples.flatMap((triple) => triple.predicate);
-  //because this should dedupe for us
-  //ugly cast here
-  const schemas: Record<string, JsonSchema> =
-    await chrome.storage.local.get(topics);
-
-  return {
-    origin: originState.origin,
-    didProfile: {
-      did: originState.did,
-      assertions: triples,
-      schemas,
-    },
-  };
-}
-
-chrome.tabs.onActivated.addListener(function (tab) {
-  // chrome.runtime.sendMessage({
-  //   type: 'originActivated',
-  //   payload: {
-  //     url: 'test',
-  //     domainDid: undefined,
-  //   },
-  // } satisfies OriginActivated);
-  // tabs.get(tab.tabId).then(async (activeTab) => {
-  //   if (!activeTab.url) return;
-  //
-  //   const details = await getOriginDetails(activeTab.url);
-  //
-  //   chrome.runtime.sendMessage({
-  //     type: 'originActivated',
-  //     payload: details,
-  //   } satisfies OriginActivated);
-  // });
-});
-
 async function saveOrigin(tabId: number, url: string): Promise<LinkedIdentifier> {
   const {origin} = new URL(url);
   //todo: check for cached origin
   const domainDidResult = await getVerifiedDomainDid(origin);
-  console.log(domainDidResult)
   //put in local storage
   if (domainDidResult.status === 'failure') {
+    console.log(domainDidResult)
     const previousIdentifier = await getLinkedIdentifierByOrigin(origin)
     const newIdentifier: LinkedIdentifier = {
       origin: origin,
@@ -230,14 +251,19 @@ async function saveOrigin(tabId: number, url: string): Promise<LinkedIdentifier>
     [domainDidResult.did]: identifier,
   });
 
+  setDidIcon(tabId, domainDidResult.did)
+
+  return identifier
+}
+
+function setDidIcon(tabId: number, did: string) {
   const canvas = new OffscreenCanvas(32, 32);
   const ctx = canvas.getContext('2d');
   if (ctx) {
-    console.log('set icon')
     //its fiiine
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
-    jdenticonDrawIcon(ctx, domainDidResult.did, 32, {
+    jdenticonDrawIcon(ctx, did, 32, {
       // backColor: '#fff',
     });
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -248,8 +274,6 @@ async function saveOrigin(tabId: number, url: string): Promise<LinkedIdentifier>
       imageData: imageData,
     });
   }
-
-  return identifier
 }
 
 chrome.tabs.onUpdated.addListener(async function (tabId, changeInfo, tab) {
@@ -265,56 +289,13 @@ chrome.tabs.onUpdated.addListener(async function (tabId, changeInfo, tab) {
       return
     }
 
-    console.log(tab.url)
     await saveOrigin(tabId, tab.url)
   }
-
-  //this should send an originActivated event when the currently active tab loads a new origin
-  // if (tab.active && tab.status === 'complete' && tab.url) {
-  //   const { origin } = new URL(tab.url);
-  //
-  //   chrome.storage.local.get(origin).then(async (state) => {
-  //     const originState: LinkedIdentifier = state[origin];
-  //     //todo: set icon
-  //     if (!originState.did) {
-  //       await chrome.runtime.sendMessage({
-  //         type: 'originActivated',
-  //         payload: {
-  //           origin: originState.origin,
-  //           didProfile: undefined,
-  //         },
-  //       } satisfies OriginActivated);
-  //       return;
-  //     }
-  //
-  //     const triples = await graph.get<AssertionSetTriple>({
-  //       subject: originState.did,
-  //     });
-  //     //this has dupes in it.. i think its fine
-  //     const topics = triples.flatMap((triple) => triple.predicate);
-  //     //because this should dedupe for us
-  //     //ugly cast here
-  //     const schemas: Record<string, JsonSchema> =
-  //       await chrome.storage.local.get(topics);
-  //
-  //     await chrome.runtime.sendMessage({
-  //       type: 'originActivated',
-  //       payload: {
-  //         origin: originState.origin,
-  //         didProfile: {
-  //           did: originState.did,
-  //           assertions: triples,
-  //           schemas,
-  //         },
-  //       },
-  //     } satisfies OriginActivated);
-  //   });
-  // }
 });
 
 export type DidProfile = {
   did: string;
-  assertions: AssertionSetTriple[];
+  assertions: (AssertionSetTriple & { origin: string | undefined })[];
   schemas: Record<string, JsonSchema>;
 };
 
@@ -353,7 +334,7 @@ export type FindDocs = {
 export type FindDocsResponse = {
   type: 'findDocsResponse';
   payload: {
-    docs: TrustEstablishmentDoc[];
+    docs: TrustEstablishmentDocContainer[];
     schemas: JsonSchema[];
   };
 };
@@ -381,6 +362,7 @@ export type ResolveSchemasResponse = {
 export type ImportDoc = {
   type: 'importDoc';
   payload: {
+    source: string | undefined;
     doc: TrustEstablishmentDoc;
   };
 };
@@ -402,6 +384,11 @@ export type ClearState = {
   type: 'clearState';
 };
 
+
+export type RefreshDOcs = {
+  type: 'refreshDocs';
+};
+
 export type BackgroundMessage =
   | GetProfile
   | GetProfileResponse
@@ -410,7 +397,8 @@ export type BackgroundMessage =
   | FindDocs
   | OriginActivated
   | ResolveSchemas
-  | ClearState;
+  | ClearState
+  | RefreshDOcs
 
 function jsonLinks() {
   const linkElements = document.querySelectorAll('a');
@@ -432,6 +420,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           getLinkedIdentifierByOrigin(
             typedMessage.payload.identifier.origin,
           ).then(async (linkedIdentifier) => {
+            if (linkedIdentifier?.did && tabId) {
+              setDidIcon(tabId, linkedIdentifier.did)
+            }
             const identifier = linkedIdentifier ?? (tabId ? await saveOrigin(tabId, origin) : undefined)
 
             if (!identifier) {
@@ -480,52 +471,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
     }
     case 'importDoc': {
-      const topics = toTopics(typedMessage.payload.doc);
-      //based on the order that the ui does things we've already resolved all the schemas
-      //but i'm gunno leave this just in case
-      chrome.storage.local.get(topics).then(async (existingSchemas) => {
-        Promise.all(
-          topics.map(async (topic) => {
-            const existing: JsonSchema | undefined = existingSchemas[topic];
-            if (existing) return undefined;
-
-            const result = await fetch(topic);
-            if (!result.ok) throw Error(result.statusText);
-
-            //todo validate this is a json schema
-            return result.json() as Promise<JsonSchema>;
-          }),
-        ).then(
-          async (schemas) => {
-            //save any topic schemas we haven't saved already
-            //weird, should probably not use chrome storage for this
-            await chrome.storage.local.set(
-              Object.fromEntries(
-                schemas.flatMap((schema) =>
-                  schema ? [[schema.$id, schema]] : [],
-                ),
-              ),
-            );
-            //put the doc in our graph
-            graph.put(toTriples(typedMessage.payload.doc)).then(() => {
-              sendResponse({
-                type: 'importDocResponse',
-                payload: {err: undefined},
-              } satisfies ImportDocResponse);
-            });
-          },
-          (err) => {
-            console.log(err);
-            //if we can't find a schema then just cancel the whole import
-            //todo: could partially import and just skipping the missing topic
-            sendResponse({
-              type: 'importDocResponse',
-              payload: {err: err.toString()},
-            } satisfies ImportDocResponse);
-          },
-        );
-      });
-
+      importDoc(typedMessage.payload).then(result =>
+        sendResponse({
+          type: 'importDocResponse',
+          payload: result,
+        } satisfies ImportDocResponse));
       return true;
     }
     case 'findDocs': {
@@ -558,7 +508,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         //want to ignore docs that failed to fetch
         //so we return everything in the happy path so we can use Promise.all() and filter later
         const fetchDocs: Promise<
-          | { status: 'success'; doc: TrustEstablishmentDoc }
+          | { status: 'success'; doc: TrustEstablishmentDoc, source: string }
           | { status: 'failure'; error: unknown }
         >[] = ofOrigin.map(async (url) => {
           const result = await fetch(url);
@@ -573,6 +523,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             const json = await result.json();
             return {
               status: 'success',
+              source: url.toString(),
               doc: json as TrustEstablishmentDoc,
             } as const;
           } catch (e) {
@@ -583,19 +534,36 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           }
         });
 
-        //main i really wish typescript had a proper either type
-        const docs = (await Promise.all(fetchDocs)).flatMap((maybeDoc) => {
-          if (maybeDoc.status === 'success') return [maybeDoc.doc];
+        //main i really wish typescript had a proper either or result type
+        const docContainers = (await Promise.all(fetchDocs)).flatMap((maybeDoc) => {
+          if (maybeDoc.status === 'success') return [{
+            source: maybeDoc.source,
+            doc: maybeDoc.doc
+          }];
           console.log(maybeDoc.error);
           return [];
         });
 
-        const schemas = await resolveTopicSchemas(toUniqueTopics(docs));
+        const uniqueTopics = docContainers.reduce(
+          (agg, current) => {
+            toTopics(current.doc).forEach((topic) => {
+              if (!agg.seen.has(topic)) {
+                agg.topics.push(topic);
+                agg.seen.add(topic);
+              }
+            });
+
+            return agg;
+          },
+          { topics: new Array<string>(), seen: new Set() },
+        ).topics;
+
+        const schemas = await resolveTopicSchemas(uniqueTopics);
 
         sendResponse({
           type: 'findDocsResponse',
           payload: {
-            docs: docs,
+            docs: docContainers,
             schemas: schemas,
           },
         } satisfies FindDocsResponse);
@@ -627,6 +595,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
       return false;
     }
+    case 'refreshDocs': {
+      refresh().then(() => {
+        sendResponse({})
+      })
+      return true
+    }
   }
 
   if (message.greeting === 'tip') {
@@ -634,6 +608,97 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 });
+
+function compareVersion(left: string, right: string) {
+  if(left === right) return 'same'
+  const leftInt = parseInt(left)
+  const rightInt = parseInt(right)
+  if(!isNaN(leftInt) && !isNaN(rightInt)) {
+    if(rightInt > leftInt) return 'higher'
+    return 'lower'
+  }
+  //we know its different but can't figure out an order
+  return 'different'
+}
+
+function isNextVersion(current: TrustEstablishmentDoc, maybeNext: TrustEstablishmentDoc) {
+
+}
+//should be decomposed into a couple functions and not need the replace param
+//replacing should probably be the default behaviour and docs should be retrievable by id
+async function importDoc({doc, source}: TrustEstablishmentDocContainer, current?: {doc: TrustEstablishmentDoc, index: number}): Promise<{
+  err: string | undefined;
+}> {
+  //this shouldn't be in here, should be two functions that compose
+  if(current) {
+    if(current.doc.id !== doc.id) {
+      console.log('warn: replacing doc with different id')
+    } else {
+      const comparison = compareVersion(current.doc.version, doc.version)
+      if (comparison === 'same') return {err: `skipping import of doc with same version: ${doc.version} = ${current.doc.version}`}
+      if (comparison === 'lower') return {err: `skipping import of doc with lower version: ${doc.version} < ${current.doc.version} < `}
+    }
+
+    //if its different or higher then we let the overwrite happen
+  }
+
+  const topics = toTopics(doc);
+  //based on the order that the ui does things we've already resolved all the schemas
+  //but i'm gunno leave this just in case
+  const existingSchemas = await chrome.storage.local.get(topics)
+
+  return Promise.all(
+    topics.map(async (topic) => {
+      const existing: JsonSchema | undefined = existingSchemas[topic];
+      if (existing) return undefined;
+
+      const result = await fetch(topic);
+      if (!result.ok) throw Error(result.statusText);
+
+      //todo validate this is a json schema
+      return result.json() as Promise<JsonSchema>;
+    }),
+  ).then(
+    async (schemas) => {
+      //save any topic schemas we haven't saved already
+      //weird, should probably not use chrome storage for this
+      await chrome.storage.local.set(
+        Object.fromEntries(
+          schemas.flatMap((schema) =>
+            schema ? [[schema.$id, schema]] : [],
+          ),
+        ),
+      );
+      //add doc to collection
+      // todo: this should probably be deduped
+      //e.g. shouldn't have two docs with same id and version
+      const docs = await getDocs()
+      const container = {
+        source,
+        doc
+      }
+
+      if(current) {
+        //delete triples for stale trust doc
+        const staleTriples = toTriples(current.doc)
+        await graph.del(staleTriples)
+        docs[current.index] = container
+      } else {
+        docs.push(container)
+      }
+      await chrome.storage.local.set({docs})
+      //put the doc in our graph
+      await graph.put(toTriples(doc))
+      return {err: undefined}
+    },
+    (err) => {
+      console.log(err);
+      //if we can't find a schema then just cancel the whole import
+      //todo: could partially import and just skipping the missing topic
+      return {err: err.toString()}
+    },
+  );
+}
 
 //lots of side effects all mixed up here :/
 async function resolveTopicSchemas(topics: string[]) {

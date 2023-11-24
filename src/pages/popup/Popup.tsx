@@ -9,6 +9,7 @@ import {TrustDocImporter} from './trustDocImporter';
 import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs';
 import ProfilePage from './profilePage';
 import {DidIcon} from '@/components/didIcon';
+import {Toaster} from '@/components/ui/toaster'
 
 export default function Popup() {
   const [domainProfile, setDomainProfile] = useState<Profile | null>(null);
@@ -120,6 +121,7 @@ export default function Popup() {
         </TabsContent>
         <TabsContent value="import" className={'mt-0'}>
           <TrustDocImporter origin={origin}/>
+          <Toaster />
         </TabsContent>
       </Tabs>
     </div>

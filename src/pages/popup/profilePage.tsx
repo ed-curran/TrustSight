@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  AssertionSetTriple,
+  AssertionSetTriple, AssertionSetTripleWithOrigin,
   JsonSchema,
   tripleToString,
 } from '@/lib/trustestablishment/trustEstablishment';
@@ -82,7 +82,8 @@ export default function ProfilePage({
         <ChevronLeftIcon />
       </Button>
       <div className={'z-10 flex flex-col items-center mb-5 -mt-4'}>
-        <div className={'flex items-center justify-center h-8 w-[100%] mb-2'}>
+        <div className={'flex flex-none items-center justify-center justify-items-center h-8 mb-2'}>
+          {/*too many divs this is stupid*/}
           {selectedAssertionSet && (
             <DidIcon
               className={'w-8 h-8 mr-1 animate-in fade-in'}
@@ -91,7 +92,7 @@ export default function ProfilePage({
             />
           )}
           {profile.origin ? (
-            <p className={'text-sm font-medium leading-none text-center'}>
+            <p className={'text-sm font-medium'}>
               {new URL(profile.origin).hostname}
             </p>
           ) : (
@@ -202,7 +203,7 @@ function AssertionCard({
   schemas,
   onProfileClicked,
 }: {
-  triple: AssertionSetTriple;
+  triple: AssertionSetTripleWithOrigin;
   selectedKey: string | null;
   onToggled: (key: string | null) => void;
   schemas: Record<string, JsonSchema>;
@@ -228,6 +229,7 @@ function AssertionCard({
           <DidIcon
             className={'w-8 h-8 z-50'}
             did={triple.object}
+            origin={triple.origin}
             onClicked={onProfileClicked}
           />
           <h3 className={'text-muted-foreground text-xs'}>says. . .</h3>
@@ -245,7 +247,7 @@ function AssertionCard({
                   {property}
                 </p>
                 <p className={'text-xs font-light text-muted-foreground'}>
-                  {JSON.stringify(value)}
+                  {displayAssertion(value)}
                 </p>
               </div>
             ))}
@@ -278,3 +280,11 @@ function AssertionCard({
 //     </Card>
 //   );
 // }
+
+function displayAssertion(assertion: unknown) {
+  if(typeof assertion === 'object') {
+    //lazy, todo figure out how to display nested assertions better
+    return JSON.stringify(assertion)
+  }
+  return (assertion as any).toString()
+}

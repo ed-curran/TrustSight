@@ -36,6 +36,11 @@ declare module 'levelgraph' {
       triple: Partial<Triple>,
       callback: (err: Error, result: T[]) => void,
     ): void;
+
+    del<T extends Triple>(
+      triple: T | T[],
+      callback: (err: Error) => void,
+    ): void;
   }
 
   export default function levelgraph(db: any): LevelGraph;

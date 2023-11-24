@@ -8,11 +8,13 @@ import {
 
 export const DidIcon = ({
   did,
+  origin,
   size = '100%',
   className,
   onClicked,
 }: {
   did: string;
+  origin?: string
   size?: string;
   className?: string;
   onClicked?: (did: string) => void;
@@ -33,7 +35,7 @@ export const DidIcon = ({
         </TooltipTrigger>
         <TooltipContent className={'DidTooltipContent'}>
           <p className={'max-h-[80px] max-w-[230px] text-xs break-all'}>
-            {did}
+            {origin ? (new URL(origin).hostname) : did}
           </p>
         </TooltipContent>
       </Tooltip>

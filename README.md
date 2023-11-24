@@ -3,7 +3,7 @@
 </p>
 
 # TrustSight - The trust overlay for your browser.
-Browse the web with confidence - guided by the voices of those that you trust.
+Browse the web with confidence - guided by the voices you trust.
 
 ## What is it
 
@@ -23,7 +23,7 @@ When you click on the TrustSight icon, it will display any trust assertions that
 any [Trust Establishment Documents](https://identity.foundation/trust-establishment/) that you have imported.
 
 It's easy to import a trust establishment document. Simply open up TrustSight, 
-and in the import tab you will see any trust documents that have been published by the current site you are viewing.
+and in the import tab you can see any trust documents that have been published by the current site you are viewing.
 Use it when a site you trust indicates that it has trust documents available.
 
 Additionally, it's possible to import trust establishment documents manually, by providing either a link to a document or a raw document as json. 

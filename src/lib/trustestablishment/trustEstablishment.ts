@@ -15,7 +15,10 @@ export type TrustEstablishmentDoc<
   validFrom: string;
   version: string;
   entries: T;
+  publisherDid?: string
 };
+
+
 
 type SchemaEntry<T extends Record<string, unknown>> = Record<
   string,
@@ -38,6 +41,12 @@ type TrustEstablishmentEntity = {
   //we could track the assertions that this entity has made here too
   //but i dunno if i want to keep this type scoped to entities as a subject or not yet
 };
+
+export type AssertionSetTripleWithOrigin = Triple<{
+  readonly docId: string;
+  readonly assertions: Record<string, unknown>;
+  readonly origin: string | undefined
+}>;
 
 export type AssertionSetTriple = Triple<{
   readonly docId: string;
@@ -151,6 +160,7 @@ export function toUniqueTopics(docs: TrustEstablishmentDoc[]) {
 
 export type TrustDocSummary = {
   doc: TrustEstablishmentDoc;
+  source: string | undefined
   topics: {
     id: string;
     title: string;
@@ -212,7 +222,6 @@ export async function fetchDoc(
 
   //want to ignore docs that failed to fetch
   //so we return everything in the happy path so we can use Promise.all() and filter later
-
   const result = await fetch(url);
   if (!result.ok)
     return {

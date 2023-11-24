@@ -7,5 +7,6 @@ export function promisifyLevelGraph(graph: LevelGraph) {
     ...graph,
     get: promisify(graph.get),
     put: promisify(graph.put),
+    del: promisify(graph.del)
   };
 }

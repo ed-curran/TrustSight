@@ -4,6 +4,7 @@ import './index.css';
 import '@/assets/styles/tailwind.css';
 import Popup from './Popup';
 import { ThemeProvider } from '@/components/themeProvider';
+import {Toaster} from '@/components/ui/toaster'
 
 function init() {
   const rootContainer = document.querySelector('#__root');
