@@ -1,18 +1,26 @@
 import React, { useState } from 'react';
 import {
-  AssertionSetTriple, AssertionSetTripleWithOrigin,
+  AssertionSetTriple,
+  AssertionSetTripleWithOrigin,
   JsonSchema,
   tripleToString,
 } from '@/lib/trustestablishment/trustEstablishment';
 import { Profile } from '@/pages/background';
 import { DidIcon } from '@/components/didIcon';
 import {
-  ChevronLeftIcon, DrawingPinIcon,
-  QuestionMarkCircledIcon, SewingPinIcon,
+  ChevronLeftIcon,
+  DrawingPinIcon,
+  QuestionMarkCircledIcon,
+  SewingPinIcon,
 } from '@radix-ui/react-icons';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 export type ProfileProps = {
   onOtherProfileSelected: (did: string) => void;
@@ -61,7 +69,7 @@ export default function ProfilePage({
               </p>
             )}
           </div>
-          <QuestionMarkCircledIcon className={'w-32 h-32'} stroke-width={1} />
+          <QuestionMarkCircledIcon className={'w-32 h-32'} strokeWidth={1} />
           <p className={'text-xs text-muted-foreground'}>
             This domain has no trust presence
           </p>
@@ -82,7 +90,11 @@ export default function ProfilePage({
         <ChevronLeftIcon />
       </Button>
       <div className={'z-10 flex flex-col items-center mb-5 -mt-4'}>
-        <div className={'flex flex-none items-center justify-center justify-items-center h-8 mb-2'}>
+        <div
+          className={
+            'flex flex-none items-center justify-center justify-items-center h-8 mb-2'
+          }
+        >
           {/*too many divs this is stupid*/}
           {selectedAssertionSet && (
             <DidIcon
@@ -104,32 +116,41 @@ export default function ProfilePage({
               unknown
             </p>
           )}
-          {
-          !props.hasTabsPermission && prevProfile === undefined && <TooltipProvider>
-            <Tooltip delayDuration={0}>
-              <TooltipTrigger className={''} asChild>
-                <Button onClick={() => {
-                  chrome.permissions.request({
-                    permissions: ['tabs'],
-                  }, (granted) => {
-                    // The callback argument will be true if the user granted the permissions.
-                    if (granted) {
-                      props.onPermissionsGranted()
-                    } else {
-
-                    }
-                  });
-                }
-                } size={'icon'} variant={'ghost'} className={'z-50 w-6 h-6 ml-1 -mr-7'}><DrawingPinIcon/></Button>
-              </TooltipTrigger>
-              <TooltipContent className={'DidTooltipContent'}>
-                <p className={'max-h-[80px] max-w-[230px] text-xs'}>
-                  Show preview in extension icon - this requires extra permissions
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          }
+          {!props.hasTabsPermission && prevProfile === undefined && (
+            <TooltipProvider>
+              <Tooltip delayDuration={0}>
+                <TooltipTrigger className={''} asChild>
+                  <Button
+                    onClick={() => {
+                      chrome.permissions.request(
+                        {
+                          permissions: ['tabs'],
+                        },
+                        (granted) => {
+                          // The callback argument will be true if the user granted the permissions.
+                          if (granted) {
+                            props.onPermissionsGranted();
+                          } else {
+                          }
+                        },
+                      );
+                    }}
+                    size={'icon'}
+                    variant={'ghost'}
+                    className={'z-50 w-6 h-6 ml-1 -mr-7'}
+                  >
+                    <DrawingPinIcon />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className={'DidTooltipContent'}>
+                  <p className={'max-h-[80px] max-w-[230px] text-xs'}>
+                    Show preview in extension icon - this requires extra
+                    permissions
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
 
         {!selectedAssertionSet && (
@@ -282,9 +303,9 @@ function AssertionCard({
 // }
 
 function displayAssertion(assertion: unknown) {
-  if(typeof assertion === 'object') {
+  if (typeof assertion === 'object') {
     //lazy, todo figure out how to display nested assertions better
-    return JSON.stringify(assertion)
+    return JSON.stringify(assertion);
   }
-  return (assertion as any).toString()
+  return (assertion as any).toString();
 }

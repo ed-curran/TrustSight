@@ -33,8 +33,8 @@ export const DidIcon = ({
             <Jdenticon className="bg-white" value={did} size={size} />
           </button>
         </TooltipTrigger>
-        <TooltipContent className={'DidTooltipContent'}>
-          <p className={'max-h-[80px] max-w-[230px] text-xs break-all'}>
+        <TooltipContent className={'DidTooltipContent mt-4'}>
+          <p className={'max-h-[60px] max-w-[230px] text-xs break-all overflow-y-scroll scrollbar-w-[5px] scrollbar scrollbar-thumb-primary/80 scrollbar-track-accent/50 scrollbar-thumb-rounded-full'}>
             {origin ? (new URL(origin).hostname) : did}
           </p>
         </TooltipContent>

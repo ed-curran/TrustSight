@@ -1,68 +1,93 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   GetProfile,
   GetProfileResponse,
   Identifier,
   Profile,
 } from '@/pages/background';
-import {TrustDocImporter} from './trustDocImporter';
-import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs';
+import { TrustDocImporter } from './trustDocImporter';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ProfilePage from './profilePage';
-import {DidIcon} from '@/components/didIcon';
-import {Toaster} from '@/components/ui/toaster'
+import { DidIcon } from '@/components/didIcon';
+import { Toaster } from '@/components/ui/toaster';
 
 export default function Popup() {
   const [domainProfile, setDomainProfile] = useState<Profile | null>(null);
   const [currentProfile, setCurrentProfile] = useState<Profile | null>(null);
 
-  const [hasTabsPermission, setHasTabsPermission] = useState<boolean | null>(null)
+  const [hasTabsPermission, setHasTabsPermission] = useState<boolean | null>(
+    null,
+  );
 
-  const updateProfile = useCallback((identifier: Identifier, tabId?: number) => {
-    chrome.runtime
-      .sendMessage({
-        type: 'getProfile',
-        payload: {identifier: identifier, tabId},
-      } satisfies GetProfile)
-      .then((response: GetProfileResponse) => {
-        if (response.payload && domainProfile === null)
-          setCurrentProfile({
-            origin: response.payload.origin,
-            didProfile: response.payload.didProfile,
-          });
-      });
-  }, []);
-
-  useEffect(() => {
-    chrome.tabs.query({active: true}).then(([activeTab]) => {
-      if (!activeTab.id || !activeTab.url) return;
-
-      const {origin} = new URL(activeTab.url);
-      const originIdentifier = {type: 'origin', origin} as const;
-
+  const updateProfile = useCallback(
+    (identifier: Identifier, tabId?: number) => {
       chrome.runtime
         .sendMessage({
           type: 'getProfile',
-          payload: {identifier: originIdentifier, tabId: activeTab.id},
+          payload: { identifier: identifier, tabId },
         } satisfies GetProfile)
         .then((response: GetProfileResponse) => {
-          if (response.payload) {
-            setDomainProfile(response.payload);
-            setCurrentProfile(response.payload);
+          if (response.payload && domainProfile === null)
+            setCurrentProfile({
+              origin: response.payload.origin,
+              didProfile: response.payload.didProfile,
+            });
+          else if (domainProfile === null) {
+            setCurrentProfile({
+              origin: undefined,
+              didProfile: undefined,
+            });
           }
         });
-    }).then(() => {
-      chrome.permissions.contains({
-        permissions: ['tabs'],
-      }, (granted) => {
-        // The callback argument will be true if the user granted the permissions.
-        if (granted) {
-          setHasTabsPermission(true)
-        } else {
-          setHasTabsPermission(false)
-        }
-      })
-    });
+    },
+    [],
+  );
 
+  useEffect(() => {
+    chrome.tabs
+      .query({ active: true })
+      .then(([activeTab]) => {
+        if (!activeTab.id || !activeTab.url) return;
+
+        const { origin } = new URL(activeTab.url);
+        const originIdentifier = { type: 'origin', origin } as const;
+
+        chrome.runtime
+          .sendMessage({
+            type: 'getProfile',
+            payload: { identifier: originIdentifier, tabId: activeTab.id },
+          } satisfies GetProfile)
+          .then((response: GetProfileResponse) => {
+            if (response.payload) {
+              setDomainProfile(response.payload);
+              setCurrentProfile(response.payload);
+            } else {
+              setDomainProfile({
+                origin: undefined,
+                didProfile: undefined,
+              });
+              setCurrentProfile({
+                origin: undefined,
+                didProfile: undefined,
+              });
+            }
+          });
+      })
+      .then(() => {
+        chrome.permissions.contains(
+          {
+            permissions: ['tabs'],
+          },
+          (granted) => {
+            // The callback argument will be true if the user granted the permissions.
+            if (granted) {
+              setHasTabsPermission(true);
+            } else {
+              setHasTabsPermission(false);
+            }
+          },
+        );
+      });
   }, []);
 
   const profileIsDomain =
@@ -98,8 +123,8 @@ export default function Popup() {
                 profilesStack.current[profilesStack.current.length - 1] && {
                   //stupid
                   origin:
-                  profilesStack.current[profilesStack.current.length - 1]
-                    .origin,
+                    profilesStack.current[profilesStack.current.length - 1]
+                      .origin,
                   did: profilesStack.current[profilesStack.current.length - 1]
                     .didProfile?.did,
                 }
@@ -108,7 +133,7 @@ export default function Popup() {
               onPermissionsGranted={() => setHasTabsPermission(true)}
               onOtherProfileSelected={(did) => {
                 profilesStack.current.push(currentProfile);
-                updateProfile({type: 'did', did});
+                updateProfile({ type: 'did', did });
               }}
               onPrev={() => {
                 const prev = profilesStack.current.pop();
@@ -116,11 +141,15 @@ export default function Popup() {
               }}
             />
           ) : (
-            <p>not a domain</p>
+            <div className={'flex flex-col items-center text-center space-y-4'}>
+              <p className={'py-20 text-muted-foreground font-light'}>
+                loading...
+              </p>
+            </div>
           )}
         </TabsContent>
         <TabsContent value="import" className={'mt-0'}>
-          <TrustDocImporter origin={origin}/>
+          <TrustDocImporter origin={origin} />
           <Toaster />
         </TabsContent>
       </Tabs>
