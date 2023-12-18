@@ -50,10 +50,10 @@ then follow this to load the dev extension in your browser:
 
 https://crxjs.dev/vite-plugin/getting-started/react/dev-basics
 
+And pin TrustSight to your extensions bar in chrome so you can access it easily.
 ### Build
 
 
 ```bash
 npm run build
 ```
-
