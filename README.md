@@ -34,15 +34,26 @@ For development and bundling we're using [CRXJS with vite](https://crxjs.dev/vit
 
 For the UI we're using React, [Tailwind](https://tailwindcss.com/) and [shadcn/ui](https://ui.shadcn.com/).
 
-Dev
+Make sure you have node (tested with 18) and npm installed. Then run 
+```bash
+npm install
+```
 
+### Dev
+
+run
 ```bash
 npm run dev
 ```
 
-Build
+then follow this to load the dev extension in your browser:
+
+https://crxjs.dev/vite-plugin/getting-started/react/dev-basics
+
+And pin TrustSight to your extensions bar in chrome so you can access it easily.
+### Build
+
 
 ```bash
 npm run build
 ```
-
